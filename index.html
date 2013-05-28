@@ -270,7 +270,7 @@ var life_t = function() {
 	    // starting at 7 scaling to see splash screen
 	    value : 7, 
 	    margin : 6,
-	    width : 300,
+	    width : 400,
 	    height : 12
 	};
 
@@ -281,7 +281,7 @@ var life_t = function() {
 	    maxv : 10,
 	    value : 5,
 	    margin : 6,
-	    width : 300,
+	    width : 400,
 	    height : 12
 	};
 
@@ -550,11 +550,13 @@ var x = new life_t();
 </head>
 <body>
 
-<p>Cells are born if they have 3  neighbors. They live if they have 2
+<p style="width:50%;">
+Cells are born if they have 3  neighbors. They live if they have 2
 or 3 neighbors and die otherwise. When the status is idle, click to
 add live cells. Click on live cells to remove them.</p>  
 
-<p>You can also add/remove cells while the simulation is running.
+<p style="width:50%;">
+You can also add/remove cells while the simulation is running.
 Any added cells need to be near 2 other cells when placed otherwise
 they will immediately die according to the rules of the game.</p>
 
@@ -583,23 +585,30 @@ Your browser does not support the HTML5 canvas tag.
 &nbsp;
 <button type="button" id="get_splash">Get splash screen</button>
 <br>
-
-<table>
-<tr>
-<td>Grid spacing:</td>
-<td><canvas id="spacing" width="300" height="12">
-Your browser does not support the HTML5 canvas tag.
-</canvas></td></tr>
-<tr>
-<td>Speed:</td>
-<td><canvas id="speed" width="300" height="12">
-Your browser does not support the HTML5 canvas tag.
-</canvas></td></tr>
-</table>
-
-Steps: <input type="text" id="steps" value="2000">
 <br>
 Status: <a id="status">idle</a><br>
+<br>
+<table>
+<tr>
+   <td align="right">Grid spacing:</td>
+   <td><canvas id="spacing" width="400" height="12">
+        Your browser does not support the HTML5 canvas tag.
+       </canvas></td></tr>
+<tr>
+   <td colspan=2>&nbsp;</td>
+</tr>
+<tr>
+   <td align="right">Speed:</td>
+   <td><canvas id="speed" width="400" height="12">
+       Your browser does not support the HTML5 canvas tag.
+       </canvas></td></tr>
+<tr>
+   <td align="right"> Steps: </td>
+   <td> <input type="text" id="steps" value="2000"> </td>
+</tr>
+</table>
+<br>
+
 
 <script>
 x.startup()
