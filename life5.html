@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<! John Conway's Game of Life >
+<! markcharney@gmail.com >
+
+<html>
+<head>
+<meta http-equiv="X-UA-Compatible" content="IE=Edge">
+<style type="text/css">
+  ::selection { background: transparent;  }
+  body { background-color:#ffffff;  }
+</style>
+
+<title>John Conway's Game of Life</title>
+<script>
+
+
+
+var slider_t = function(aargs) {
+    // private variables
+    var args = aargs;
+    var that = this;
+    var half_height = Math.floor(args.height / 2);
+    var nr =  args.width - 2 * args.margin;
+
+    // public functions 
+    this.value = function() {
+	return args.value;
+    }
+
+    this.redraw = function() {
+	var c=document.getElementById(args.name);
+	var ctx=c.getContext("2d");
+	ctx.clearRect(0,0,args.width,args.height);
+	ctx.beginPath();
+	ctx.moveTo(args.margin,half_height);
+	ctx.lineTo(args.width-args.margin, half_height);
+	ctx.stroke();
+
+	args.px = args.margin + Math.floor((args.value / args.maxv) * nr);
+	ctx.beginPath();
+	ctx.fillStyle = "#0000bb";
+	ctx.arc(args.px,half_height,5,0,2*Math.PI);
+	ctx.fill();
+	ctx.stroke();
+    }
+
+    this.set_callback = function(cb,arg) {
+	that.callback = cb;
+	that.callback_arg = arg;
+    }
+    this.canvclick = function(ev) {
+	var canvas = document.getElementById(args.name);
+	var crect = canvas.getBoundingClientRect();
+	var x = ev.clientX - crect.left;
+
+        if (x < 0) 
+            x = 0;
+        if (x > args.width+args.margin) 
+            x = args.width+args.margin;
+	var d = (x-args.margin) / nr * args.maxv;
+	if (d<args.minv) 
+	    d = args.minv;
+	if (d>args.maxv) 
+	    d = args.maxv;
+	
+	if ( args.px < x ) 
+	    args.value = Math.ceil(d);
+	else
+	    args.value = Math.floor(d);
+	that.redraw();
+	that.callback(that.callback_arg);
+    }
+
+}
+
+
+var life_t = function() {
+    var minx = 30;      // left x-margin
+    var miny = 30;      // top y-margin
+    var width = 600;    // total width
+    var height = 600;   // total height
+    var hspacing = 30;  // initial grid spacing (left to right)
+    var vspacing = 30;  // initial grid spacing (top to bottom)
+    var data = null;    // typedarray of cell values 1=alive, 0=dead
+    var steps = 2000;   // # of steps to simulate
+    var active = 0;     // active vs idle
+    var starting = 1;   // show the logo on startup
+    var init_with_gliders = 0; 
+    var elements = 0;   // data points in grid = mx * my
+    var mx = 0;         // x slots
+    var my = 0;         // y slots
+    var opx = 0;        // previous x slot for gesture drawing
+    var opy = 0;        // previous x slot for gesture drawing
+    var interval = 0;   // timing speed
+    var stepi = 0;      // counter for steps
+    var down = 0;       // mouse down state 0=up, 1=down
+    var that = this;    
+
+    var left_down = 0;
+    var right_down = 1;
+    var left_up = 2;
+    var right_up = 3;
+
+    this.zoom = function() {
+	that.redraw(1);
+    }
+    this.clear_grid = function() {
+	init_with_gliders = 0;
+	for(i=0;i<elements;i++) { 
+	    data[i] = 0;
+	}
+	that.redraw(1);
+    }
+    this.get_gliders = function() {
+	init_with_gliders = 1;
+	that.redraw(1);
+    }
+    this.get_splash_screen = function() {
+	starting = 1;
+	that.redraw(1);
+    }
+
+    this.set_pos = function(i,j) {
+	if (i < mx && j < my) {
+	    data[i * my + j] = 1;
+	    that.draw_cell(i,j,1);
+	}
+    }
+
+    that.set_vline = function(x,y) { // draw a vertical line for lettering
+       var i;
+       for(i=0;i<5;i++)
+           that.set_pos(x,y+i);                   
+    }                          
+
+    that.set_a = function(x,y) {       // draw an A
+       that.set_vline(x,y);
+       that.set_vline(x+2,y);
+       that.set_pos(x+1,y);
+       that.set_pos(x+1,y+3);
+    }
+
+    that.set_o = function(x,y) {       // draw an O
+       that.set_vline(x,y);
+       that.set_vline(x+2,y);
+       that.set_pos(x+1,y);
+       that.set_pos(x+1,y+4);
+    }
+
+    that.set_l = function(x,y) {       // draw an L
+       that.set_vline(x,y);
+       that.set_pos(x+1,y+4);
+       that.set_pos(x+2,y+4);
+    }
+
+    that.set_i = function(x,y) {       // draw an I
+       that.set_vline(x+1,y);
+       that.set_pos(x,y);
+       that.set_pos(x+2,y);
+       that.set_pos(x,y+4);
+       that.set_pos(x+2,y+4);
+    }
+
+    that.set_f = function(x,y) {       // draw an F
+       that.set_vline(x,y);
+       that.set_pos(x+1,y);
+       that.set_pos(x+2,y);
+       that.set_pos(x+1,y+2);
+    }
+
+    that.set_e = function(x,y) {       // draw an E (start w/F)
+       that.set_f(x,y);
+       that.set_pos(x+1,y+4);
+       that.set_pos(x+2,y+4);
+    }
+
+    that.set_m = function(x,y) {	// draw an M
+       that.set_vline(x,y);
+       that.set_vline(x+2,y);
+       that.set_vline(x+4,y);
+       that.set_pos(x+1,y);
+       that.set_pos(x+3,y);
+    }
+
+    that.set_g = function(x,y) {	// draw a G
+       that.set_vline(x,y);
+       that.set_pos(x+1,y);
+       that.set_pos(x+2,y);
+       that.set_pos(x+1,y+4);
+       that.set_pos(x+2,y+4);
+       that.set_pos(x+2,y+3);
+    }
+
+    this.init_name = function() {	// splash screen: "GAME OF LIFE"
+       that.set_g(0,6);
+       that.set_a(4,6);
+       that.set_m(8,6);
+       that.set_e(14,6);
+
+       that.set_o(0,12);
+       that.set_f(4,12);
+
+       that.set_l(9,12);
+       that.set_i(13,12);
+       that.set_f(17,12);
+       that.set_e(21,12);
+    }                      
+
+    this.init_glider =  function(x,y,orientation) {
+	// initialize a glider, 4 orientations
+	var flip = (orientation & 2);
+	that.set_pos(x+1,y+flip);
+	if ((orientation & 1) === 1)  // right
+	    that.set_pos(x+2,y+1);
+	else 
+	    that.set_pos(x,y+1);
+	that.set_pos(x+2,y+2-flip);
+	that.set_pos(x+1,y+2-flip);
+	that.set_pos(x+0,y+2-flip);
+    }
+
+
+    this.label = function() {
+	// label the axes
+	var c=document.getElementById("myCanvas");
+	var ctx=c.getContext("2d");
+	ctx.font="12px Arial";
+	ctx.fillStyle="#000000";
+	
+	var labels = Math.floor((width - minx) / hspacing);
+	var i=0;
+	for(i=0;i<labels;i++) {
+	    x = minx + i * hspacing + (hspacing *.25);
+	    y = 10;
+	    ctx.fillText(i,x,y);	
+	}
+	labels = Math.floor((height - miny) / vspacing);
+	for(i=0;i<labels;i++) {
+	    x = 0
+	    y = miny + i * vspacing + (vspacing *0.75);
+	    ctx.fillText(i,x,y);	
+	}
+    }
+    this.mouseup = function(ev) {
+	down = 0;
+    }
+
+    this.draw_one = function(loc) {
+	var p = my * loc.px + loc.py;
+	if (p < elements) {
+            var nv = 1-data[p]; //toggle
+            that.draw_cell(loc.px,loc.py,nv);
+	    data[p] = nv;
+	}
+    }
+
+
+    that.locate = function(ev) {
+	var canvas = document.getElementById("myCanvas");
+	var crect = canvas.getBoundingClientRect();
+	var x = ev.clientX - crect.left;
+	var y = ev.clientY - crect.top; 
+	if (x <= minx ||  y < miny)  { 
+	    return null;
+	}
+	var px = Math.floor((x-minx) / hspacing);
+	var py = Math.floor((y-miny) / vspacing);
+	return {"px":px,
+		"py":py};
+    }
+
+    this.mousemove = function(ev) {
+	// only gesture-draw on move if inactive
+	if (active !== 0)
+	    return;
+	if (down === 0) 
+	    return;
+
+	loc = that.locate(ev);
+	if (loc) {
+	    // force a move to a different box
+	    if (loc.px === opx && loc.py === opy) 
+		return;
+	    opx = loc.px;
+	    opy = loc.py;
+	    that.draw_one(loc);
+	}
+    }
+    this.mousedown = function(ev) {
+	down = 1;
+	// paint a cell that someone clicks on           
+        loc = that.locate(ev);
+	if (loc) {
+	    that.draw_one(loc);
+	}
+    }
+
+    this.startup_sliders = function() {
+
+	var spacing_param = {
+	    name : "spacing",
+	    minv : 1,
+	    maxv : 20,
+	    // starting at 7 scaling to see splash screen
+	    value : 7, 
+	    margin : 6,
+	    width : 400,
+	    height : 12
+	};
+
+
+	var speed_param = {
+	    name : "speed",
+	    minv : 1,
+	    maxv : 10,
+	    value : 5,
+	    margin : 6,
+	    width : 400,
+	    height : 12
+	};
+
+	that.spacing = new slider_t(spacing_param);
+	that.speed = new slider_t(speed_param);
+	that.spacing.set_callback(that.redraw,1);
+	that.speed.set_callback(that.redraw,1);
+
+	//that.speed.callback = function() {
+	//    clearInterval( interval );    
+	//    setInterval( function(){that.simulate()},
+	//		 (10-that.speed.value())*20);
+	//    redraw(1);
+	//}
+
+	var d=document.getElementById("spacing");
+	d.addEventListener("mousedown", that.spacing.canvclick, false);
+	that.spacing.redraw();
+
+	var c=document.getElementById("speed");
+	c.addEventListener("mousedown", that.speed.canvclick, false);
+	that.speed.redraw();
+    }
+
+
+    this.startup = function() {
+	// listen for mouse down events on the canvas
+	var c=document.getElementById("myCanvas");
+	c.addEventListener("mousedown", that.mousedown, false);
+	c.addEventListener("mousemove", that.mousemove, false);
+	c.addEventListener("mouseup", that.mouseup, false);
+
+	var c=document.getElementById("start");
+	c.addEventListener("click", that.startx, false);
+	c=document.getElementById("stopx");
+	c.addEventListener("click", that.stopx, false);
+	c=document.getElementById("clear");
+	c.addEventListener("click", that.clear_grid, false);
+	c=document.getElementById("get_gliders");
+	c.addEventListener("click", that.get_gliders, false);
+	c=document.getElementById("get_splash");
+	c.addEventListener("click", that.get_splash_screen, false);
+	c=document.getElementById("steps");
+	c.addEventListener("change", that.change_steps, false);
+
+	that.startup_sliders();
+	that.redraw(1);
+    }
+    
+    this.evaluate_cell = function(i,j) {
+	// see if (i,j) is in range and alive
+
+	// toroidal mesh
+	if (i < 0) 
+	    i = i + mx;
+	if (j < 0) 
+	    j = j + my;
+	if (i >= mx) 
+	    i = i - mx;
+	if (j >= my)
+	    j = j - my;
+
+	if (i>=0 && i<mx) { 
+	    if (j>=0 && j < my) { 
+		var p = my * i + j;
+		if (data[p]) {
+                    return 1;
+		}
+	    }
+	}
+	return 0;
+    }
+    this.evaluate = function(i,j,v) {
+	// look at 8 neighbors and see how many are alive
+	var c  = 0;
+	var ipr  = i-1;
+	var inx  = i+1;
+	var jpr  = j-1;
+	var jnx  = j+1;
+
+	c = c + that.evaluate_cell(ipr,jpr);
+	c = c + that.evaluate_cell(i,jpr);
+	c = c + that.evaluate_cell(inx,jpr);
+
+	c = c + that.evaluate_cell(ipr,j);
+	c = c + that.evaluate_cell(inx,j);
+
+	c = c + that.evaluate_cell(ipr,jnx);
+	c = c + that.evaluate_cell(i,jnx);
+	c = c + that.evaluate_cell(inx,jnx);
+
+
+	if (c === 3) {  
+            // 3 neighbors -> birth
+            return 1;
+	}
+	else if (c === 2) {   
+            // 2 neighbors -> no change
+            return v;
+	}
+	// over-population  or under-population -> death
+	return 0;
+    }
+
+    this.draw_cell = function(i,j,z) {
+	// paint one cell (i,j) red if z=1 and white otherwise
+	// convert to canvas coordinates
+	var x = minx + i * hspacing;
+	var y = miny + j * vspacing;
+
+	var c=document.getElementById("myCanvas");
+	var ctx=c.getContext("2d");
+	if (z === 1) {
+	    ctx.fillStyle="#FF0000"; // red
+	}	
+	else {
+	    ctx.fillStyle="#FFFFFF"; // white
+	}
+
+	// we want the minimum size box to be 1x1.
+	// We subtract 3 and add 1 to avoid overdrawing the grid lines
+	var hs = hspacing-3;
+	if (hs <= 0) 
+	    hs = 1;
+	var vs = vspacing-3;
+	if (vs <= 0) 
+	    vs = 1;
+	ctx.fillRect(x+1,y+1,hs,vs);
+    }
+
+    this.stopx = function() {
+	// turn off the periodic redrawing
+	clearInterval( interval );    
+	active = 0;                  
+	var y = document.getElementById("status");
+	y.innerHTML = "idle";
+    }
+    
+    this.startx = function() {
+	if (active === 1) { 
+	    return;
+	}
+	// set up a timer to call simulate periodically
+	stepi = 0;                      
+	var y = document.getElementById("status");
+	y.innerHTML = "running";
+	
+	active = 1;
+	interval = setInterval( function(){that.simulate()},
+				(10-that.speed.value())*20);
+    }
+    
+    this.change_steps = function() {
+	// handle the text field with the # of steps to simulate
+	var y = document.getElementById("steps");
+	steps = Math.floor(y.value);
+	if (steps < 0) {   
+	    steps = 0;
+	}
+    }
+
+    this.simulate = function() {
+	// simulate a certain # of steps and then stop
+	stepi = stepi + 1;
+	if ( active === 0 || stepi  >=  steps) {
+	    that.stopx();
+	}
+	that.simulate_one(); 
+    }
+
+    this.simulate_one = function() {
+	// evaluate one grid and make a new one. drawing as we go.
+	var data2 = new Int8Array(elements);
+	var i=0;
+	var j=0;
+	for(i=0;i<mx;i++) {
+            for(j=0;j<my;j++) {
+		var p = my * i + j;
+		var v = data[p];
+		var z = that.evaluate(i,j,v);
+		data2[p] = z;
+		if (z !== v)                   
+                    that.draw_cell(i,j,z);
+            }
+	}
+	delete data;
+	data = data2;
+    }
+
+    this.redraw = function(clear) {
+	// draw the grid and zero out the array
+	var c=document.getElementById("myCanvas");
+	var ctx=c.getContext("2d");
+
+	hspacing = 3*that.spacing.value();
+	vspacing = 3*that.spacing.value();
+
+	if (clear)  {
+	    ctx.clearRect(0,0,width,height);
+	}
+	that.label();
+	var i=0;
+	var j=0;
+        
+	// vertical lines
+	for (i=0;i<width;i+=hspacing) {
+	    ctx.beginPath();
+	    ctx.moveTo(minx + i, miny);
+	    ctx.lineTo(minx + i, miny+height);
+	    ctx.stroke();
+	}
+	
+	// horizontal lines
+	for (j=0;j<height;j+=vspacing) { 
+	    ctx.beginPath();
+	    ctx.moveTo(minx,           miny+j);
+	    ctx.lineTo(minx+width, miny+j);
+	    ctx.stroke();
+	}
+
+	// record old grid bounds for copying old data.
+        var omx = mx;
+        var omy = my;
+
+	mx = Math.floor((width-minx) / hspacing);
+	my = Math.floor((height-miny) / vspacing);
+
+	elements = mx * my;
+	var data2 = new Int8Array(elements);
+	for(i=0;i<elements;i++) { 
+	    data2[i] = 0;
+	}
+
+	if (data) { 
+            // copy the old data to the new grid
+	    var min_mx = (omx<mx)?omx:mx; 
+	    var min_my = (omy<my)?omy:my; 
+           
+            for(i=0;i<min_mx;i++) 
+		for (j=0;j<min_my;j++) {
+		    var z =  data[i*omy+j];
+		    data2[i*my+j] = z;
+		    that.draw_cell(i,j,z);
+		}
+	    delete data;
+	}
+        data = data2;
+                                
+        if (starting) {
+	    starting = 0;
+	    that.init_name();
+	}
+	else if (init_with_gliders) {
+            var i; // orientation
+            var j; 
+            for (i=0;i<2;i++) 
+		for (j=0;j<4;j++)  
+		    that.init_glider(j*10,i*10,i);
+	    init_with_gliders = 0;
+	}
+    }
+
+}; //life_t
+
+var x = new life_t();
+
+</script>
+</head>
+<body>
+
+<p style="width:50%;">
+Cells are born if they have 3  neighbors. They live if they have 2
+or 3 neighbors and die otherwise. When the status is idle, click to
+add live cells. Click on live cells to remove them.</p>  
+
+<p style="width:50%;">
+You can also add/remove cells while the simulation is running.
+Any added cells need to be near 2 other cells when placed otherwise
+they will immediately die according to the rules of the game.</p>
+
+<p style="width:50%;">
+When the simulation is not running, you can also click and drag 
+to draw strokes.</p>
+<br> 
+
+<canvas id="myCanvas" width="600" height="600" 
+     style="border:1px solid #000000;backgroundColor: #0000ff"> 
+Your browser does not support the HTML5 canvas tag.
+</canvas> <br>
+
+<button type="button" id="start">start</button>
+&nbsp;
+&nbsp;
+&nbsp;
+<button type="button" id="stopx">stop</button>
+&nbsp;
+&nbsp;
+&nbsp;
+<button type="button" id="clear">clear</button>
+&nbsp;
+&nbsp;
+&nbsp;
+<button type="button" id="get_gliders">Give me gliders!</button>
+&nbsp;
+&nbsp;
+&nbsp;
+<button type="button" id="get_splash">Get splash screen</button>
+<br>
+<br>
+Status: <a id="status">idle</a><br>
+<br>
+<table>
+<tr>
+   <td align="right">Grid spacing:</td>
+   <td><canvas id="spacing" width="400" height="12">
+        Your browser does not support the HTML5 canvas tag.
+       </canvas></td></tr>
+<tr>
+   <td colspan=2>&nbsp;</td>
+</tr>
+<tr>
+   <td align="right">Speed:</td>
+   <td><canvas id="speed" width="400" height="12">
+       Your browser does not support the HTML5 canvas tag.
+       </canvas></td></tr>
+<tr>
+   <td align="right"> Steps: </td>
+   <td> <input type="text" id="steps" value="2000"> </td>
+</tr>
+</table>
+<br>
+
+
+<script>
+x.startup()
+</script>
+
+</body>
+</html>
+
