@@ -282,6 +282,10 @@ var life_t = function() {
     }
 
     this.touchmove = function(ev) {
+	// only gesture-draw on move if inactive
+	if (active !== 0)
+	    return;
+
 	ev.preventDefault(); //avoid mouse event
 	var touches = ev.changedTouches;
 	for(var i=0;i<touches.length;i++) {
@@ -612,8 +616,8 @@ Any added cells need to be near 2 other cells when placed otherwise
 they will immediately die according to the rules of the game.</p>
 
 <p style="width:50%;">
-When the simulation is not running, you can also click and drag 
-to draw strokes.</p>
+When the simulation is not running, you can also click and drag or use
+touch to draw strokes.</p>
 <br> 
 
 <canvas id="myCanvas" width="600" height="600" 
