@@ -89,8 +89,11 @@ var life_t = function() {
     var elements = 0;   // data points in grid = mx * my
     var mx = 0;         // x slots
     var my = 0;         // y slots
+    var opx = 0;        // previous x slot for gesture drawing
+    var opy = 0;        // previous x slot for gesture drawing
     var interval = 0;   // timing speed
     var stepi = 0;      // counter for steps
+    var down = 0;       // mouse down state 0=up, 1=down
     var that = this;    
 
     var left_down = 0;
@@ -238,26 +241,75 @@ var life_t = function() {
 	    ctx.fillText(i,x,y);	
 	}
     }
-    this.canvclick = function(ev) {
-	// paint a cell that someone clicks on                          
+    this.mouseup = function(ev) {
+	down = 0;
+    }
+
+    this.draw_one = function(loc) {
+	var p = my * loc.px + loc.py;
+	if (p < elements) {
+            var nv = 1-data[p]; //toggle
+            that.draw_cell(loc.px,loc.py,nv);
+	    data[p] = nv;
+	}
+    }
+
+
+
+    that.locate = function(ev) {
 	var canvas = document.getElementById("myCanvas");
 	var crect = canvas.getBoundingClientRect();
 	var x = ev.clientX - crect.left;
 	var y = ev.clientY - crect.top; 
 	if (x <= minx ||  y < miny)  { 
-	    return;
+	    return null;
 	}
 	var px = Math.floor((x-minx) / hspacing);
 	var py = Math.floor((y-miny) / vspacing);
-	
-	var p = my * px + py;
-	if (p < elements) {
-            var nv = 1-data[p]; //toggle
-            that.draw_cell(px,py,nv);
-	    data[p] = nv;
+	return {"px":px,
+		"py":py};
+    }
+
+    that.draw_loc = function(loc)  {
+	if (loc) {
+	    // force a move to a different box
+	    if (loc.px === opx && loc.py === opy) 
+		return;
+	    opx = loc.px;
+	    opy = loc.py;
+	    that.draw_one(loc);
 	}
-	else {
-	    alert("Error");
+    }
+
+    this.touchmove = function(ev) {
+	// only gesture-draw on move if inactive
+	if (active !== 0)
+	    return;
+
+	ev.preventDefault(); //avoid mouse event
+	var touches = ev.changedTouches;
+	for(var i=0;i<touches.length;i++) {
+            loc = that.locate(touches[i]);
+	    that.draw_loc(loc);
+	}
+    }
+
+    this.mousemove = function(ev) {
+	// only gesture-draw on move if inactive
+	if (active !== 0)
+	    return;
+	if (down === 0) 
+	    return;
+
+	loc = that.locate(ev);
+	that.draw_loc(loc);
+    }
+    this.mousedown = function(ev) {
+	down = 1;
+	// paint a cell that someone clicks on           
+        loc = that.locate(ev);
+	if (loc) {
+	    that.draw_one(loc);
 	}
     }
 
@@ -310,7 +362,10 @@ var life_t = function() {
     this.startup = function() {
 	// listen for mouse down events on the canvas
 	var c=document.getElementById("myCanvas");
-	c.addEventListener("mousedown", that.canvclick, false);
+	c.addEventListener("mousedown", that.mousedown, false);
+	c.addEventListener("mousemove", that.mousemove, false);
+	c.addEventListener("touchmove", that.touchmove, false);
+	c.addEventListener("mouseup", that.mouseup, false);
 
 	var c=document.getElementById("start");
 	c.addEventListener("click", that.startx, false);
@@ -560,13 +615,17 @@ You can also add/remove cells while the simulation is running.
 Any added cells need to be near 2 other cells when placed otherwise
 they will immediately die according to the rules of the game.</p>
 
+<p style="width:50%;">
+When the simulation is not running, you can also click and drag or use
+touch to draw strokes.</p>
 <br> 
 
 <canvas id="myCanvas" width="600" height="600" 
      style="border:1px solid #000000;backgroundColor: #0000ff"> 
 Your browser does not support the HTML5 canvas tag.
 </canvas> <br>
-
+<br>
+<br>
 <button type="button" id="start">start</button>
 &nbsp;
 &nbsp;
@@ -607,7 +666,6 @@ Status: <a id="status">idle</a><br>
    <td> <input type="text" id="steps" value="2000"> </td>
 </tr>
 </table>
-<br>
 
 
 <script>
