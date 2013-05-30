@@ -255,6 +255,7 @@ var life_t = function() {
     }
 
 
+
     that.locate = function(ev) {
 	var canvas = document.getElementById("myCanvas");
 	var crect = canvas.getBoundingClientRect();
@@ -269,14 +270,7 @@ var life_t = function() {
 		"py":py};
     }
 
-    this.mousemove = function(ev) {
-	// only gesture-draw on move if inactive
-	if (active !== 0)
-	    return;
-	if (down === 0) 
-	    return;
-
-	loc = that.locate(ev);
+    that.draw_loc = function(loc)  {
 	if (loc) {
 	    // force a move to a different box
 	    if (loc.px === opx && loc.py === opy) 
@@ -285,6 +279,26 @@ var life_t = function() {
 	    opy = loc.py;
 	    that.draw_one(loc);
 	}
+    }
+
+    this.touchmove = function(ev) {
+	ev.preventDefault(); //avoid mouse event
+	var touches = ev.changedTouches;
+	for(var i=0;i<touches.length;i++) {
+            loc = that.locate(touches[i]);
+	    that.draw_loc(loc);
+	}
+    }
+
+    this.mousemove = function(ev) {
+	// only gesture-draw on move if inactive
+	if (active !== 0)
+	    return;
+	if (down === 0) 
+	    return;
+
+	loc = that.locate(ev);
+	that.draw_loc(loc);
     }
     this.mousedown = function(ev) {
 	down = 1;
@@ -346,6 +360,7 @@ var life_t = function() {
 	var c=document.getElementById("myCanvas");
 	c.addEventListener("mousedown", that.mousedown, false);
 	c.addEventListener("mousemove", that.mousemove, false);
+	c.addEventListener("touchmove", that.touchmove, false);
 	c.addEventListener("mouseup", that.mouseup, false);
 
 	var c=document.getElementById("start");
@@ -646,7 +661,6 @@ Status: <a id="status">idle</a><br>
    <td> <input type="text" id="steps" value="2000"> </td>
 </tr>
 </table>
-<br>
 
 
 <script>
